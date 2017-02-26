@@ -127,7 +127,7 @@ void SystemInit (void) {
   /* SIM->COPC: ?=0,COPCLKSEL=0,COPDBGEN=0,COPSTPEN=0,COPT=0,COPCLKS=0,COPW=0 */
   SIM->COPC = (uint32_t)0x00u;
 #endif /* (DISABLE_WDOG) */
-
+  BOARD_BootClockRUN();
 }
 
 /* ----------------------------------------------------------------------------
