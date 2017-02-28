@@ -76,6 +76,9 @@ extern const char __stdout_name[] = "/stdout";
 extern const char __stderr_name[] = "/stderr";
 #endif
 
+
+#define DEVICE_SEGGER 1
+
 // Heap limits - only used if set
 unsigned char *mbed_heap_start = 0;
 uint32_t mbed_heap_size = 0;
@@ -101,7 +104,14 @@ void remove_filehandle(FileLike *file) {
 }
 }
 
-#if DEVICE_SERIAL
+#if DEVICE_SEGGER
+#include "console/segger/RTT/SEGGER_RTT.h"
+#if MBED_CONF_PLATFORM_STDIO_CONVERT_NEWLINES
+static char stdio_in_prev;
+static char stdio_out_prev;
+#endif
+
+#elif DEVICE_SERIAL
 extern int stdio_uart_inited;
 extern serial_t stdio_uart;
 #if MBED_CONF_PLATFORM_STDIO_CONVERT_NEWLINES
@@ -111,7 +121,7 @@ static char stdio_out_prev;
 #endif
 
 static void init_serial() {
-#if DEVICE_SERIAL
+#if DEVICE_SERIAL && !DEVICE_SEGGER
     if (stdio_uart_inited) return;
     serial_init(&stdio_uart, STDIO_UART_TX, STDIO_UART_RX);
 #if MBED_CONF_PLATFORM_STDIO_BAUD_RATE
@@ -313,41 +323,50 @@ extern "C" size_t    __write (int        fh, const unsigned char *buffer, size_t
 #else
 extern "C" int PREFIX(_write)(FILEHANDLE fh, const unsigned char *buffer, unsigned int length, int mode) {
 #endif
-    int n; // n is the number of bytes written
+	  int n; // n is the number of bytes written
+	    if (fh < 3) {
+	#if DEVICE_SEGGER
+	#if MBED_CONF_PLATFORM_STDIO_CONVERT_NEWLINES
+		for (unsigned int i = 0; i < length; i++) {
+			if (buffer[i] == '\n' && stdio_out_prev != '\r') {
+				char c = '\r';
+				SEGGER_RTT_Write(0, &c, 1);
+			}
+			SEGGER_RTT_Write(0, &buffer[i], 1);
+			stdio_out_prev = buffer[i];
+		}
+	#else
+		SEGGER_RTT_Write(0, buffer, length);
+	#endif
 
-    errno = EBADF;
-    if (fh < 3) {
-#if DEVICE_SERIAL
-        if (!stdio_uart_inited) init_serial();
-#if MBED_CONF_PLATFORM_STDIO_CONVERT_NEWLINES
-        for (unsigned int i = 0; i < length; i++) {
-            if (buffer[i] == '\n' && stdio_out_prev != '\r') {
-                 serial_putc(&stdio_uart, '\r');
-            }
-            serial_putc(&stdio_uart, buffer[i]);
-            stdio_out_prev = buffer[i];
-        }
-#else
-        for (unsigned int i = 0; i < length; i++) {
-            serial_putc(&stdio_uart, buffer[i]);
-        }
-#endif
-#endif
-        n = length;
-    } else {
-        FileLike* fhc = filehandles[fh-3];
-        if (fhc == NULL) return -1;
+	#elif DEVICE_SERIAL
+	        if (!stdio_uart_inited) init_serial();
+	#if MBED_CONF_PLATFORM_STDIO_CONVERT_NEWLINES
+	        for (unsigned int i = 0; i < length; i++) {
+	            if (buffer[i] == '\n' && stdio_out_prev != '\r') {
+	                 serial_putc(&stdio_uart, '\r');
+	            }
+	            serial_putc(&stdio_uart, buffer[i]);
+	            stdio_out_prev = buffer[i];
+	        }
+	#else
+	        for (unsigned int i = 0; i < length; i++) {
+	            serial_putc(&stdio_uart, buffer[i]);
+	        }
+	#endif
+	#endif
+	        n = length;
+	    } else {
+	        FileLike* fhc = filehandles[fh-3];
+	        if (fhc == NULL) return -1;
 
-        n = fhc->write(buffer, length);
-        if (n < 0) {
-            errno = -n;
-        }
-    }
-#ifdef __ARMCC_VERSION
-    return length-n;
-#else
-    return n;
-#endif
+	        n = fhc->write(buffer, length);
+	    }
+	#ifdef __ARMCC_VERSION
+	    return length-n;
+	#else
+	    return n;
+	#endif
 }
 
 #if defined(__ICCARM__)
@@ -355,51 +374,70 @@ extern "C" size_t    __read (int        fh, unsigned char *buffer, size_t       
 #else
 extern "C" int PREFIX(_read)(FILEHANDLE fh, unsigned char *buffer, unsigned int length, int mode) {
 #endif
-    int n; // n is the number of bytes read
+	   int n; // n is the number of bytes read
+	    if (fh < 3) {
+	        // only read a character at a time from stdin
+	#if DEVICE_SEGGER
+	#if MBED_CONF_PLATFORM_STDIO_CONVERT_NEWLINES
+			while (true) {
+			   char c;
+			   while(SEGGER_RTT_read(0, &c, 1) < 0); // wait for char input
+			   if ((c == '\r' && stdio_in_prev != '\n') ||
+				   (c == '\n' && stdio_in_prev != '\r')) {
+				   stdio_in_prev = c;
+				   *buffer = '\n';
+				   break;
+			   } else if ((c == '\r' && stdio_in_prev == '\n') ||
+						  (c == '\n' && stdio_in_prev == '\r')) {
+				   stdio_in_prev = c;
+				   // onto next character
+				   continue;
+			   } else {
+				   stdio_in_prev = c;
+				   *buffer = c;
+				   break;
+			   }
+			}
+	#else
+			SEGGER_RTT_Read(0, buffer,length);
+	#endif
+	#elif DEVICE_SERIAL
+	        if (!stdio_uart_inited) init_serial();
+	#if MBED_CONF_PLATFORM_STDIO_CONVERT_NEWLINES
+	        while (true) {
+	            char c = serial_getc(&stdio_uart);
+	            if ((c == '\r' && stdio_in_prev != '\n') ||
+	                (c == '\n' && stdio_in_prev != '\r')) {
+	                stdio_in_prev = c;
+	                *buffer = '\n';
+	                break;
+	            } else if ((c == '\r' && stdio_in_prev == '\n') ||
+	                       (c == '\n' && stdio_in_prev == '\r')) {
+	                stdio_in_prev = c;
+	                // onto next character
+	                continue;
+	            } else {
+	                stdio_in_prev = c;
+	                *buffer = c;
+	                break;
+	            }
+	        }
+	#else
+	        *buffer = serial_getc(&stdio_uart);
+	#endif
+	#endif
+	        n = 1;
+	    } else {
+	        FileLike* fhc = filehandles[fh-3];
+	        if (fhc == NULL) return -1;
 
-    errno = EBADF;
-    if (fh < 3) {
-        // only read a character at a time from stdin
-#if DEVICE_SERIAL
-        if (!stdio_uart_inited) init_serial();
-#if MBED_CONF_PLATFORM_STDIO_CONVERT_NEWLINES
-        while (true) {
-            char c = serial_getc(&stdio_uart);
-            if ((c == '\r' && stdio_in_prev != '\n') ||
-                (c == '\n' && stdio_in_prev != '\r')) {
-                stdio_in_prev = c;
-                *buffer = '\n';
-                break;
-            } else if ((c == '\r' && stdio_in_prev == '\n') ||
-                       (c == '\n' && stdio_in_prev == '\r')) {
-                stdio_in_prev = c;
-                // onto next character
-                continue;
-            } else {
-                stdio_in_prev = c;
-                *buffer = c;
-                break;
-            }
-        }
-#else
-        *buffer = serial_getc(&stdio_uart);
-#endif
-#endif
-        n = 1;
-    } else {
-        FileLike* fhc = filehandles[fh-3];
-        if (fhc == NULL) return -1;
-
-        n = fhc->read(buffer, length);
-        if (n < 0) {
-            errno = -n;
-        }
-    }
-#ifdef __ARMCC_VERSION
-    return length-n;
-#else
-    return n;
-#endif
+	        n = fhc->read(buffer, length);
+	    }
+	#ifdef __ARMCC_VERSION
+	    return length-n;
+	#else
+	    return n;
+	#endif
 }
 
 #ifdef __ARMCC_VERSION
