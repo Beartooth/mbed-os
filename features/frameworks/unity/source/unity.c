@@ -539,8 +539,7 @@ void UnityAssertEqualIntArray(UNITY_INTERNAL_PTR expected,
         case UNITY_DISPLAY_STYLE_UINT8:
             while (elements--)
             {
-            	Unity.CurrentTestFailed = (*(UNITY_PTR_ATTRIBUTE const _US8*)ptr_exp != *(UNITY_PTR_ATTRIBUTE const _US8*)ptr_act);
-                if (Unity.CurrentTestFailed)
+                if (*(UNITY_PTR_ATTRIBUTE const _US8*)ptr_exp != *(UNITY_PTR_ATTRIBUTE const _US8*)ptr_act)
                 {
                     UnityTestResultsFailBegin(lineNumber);
                     UnityPrint(UnityStrElement);
@@ -561,8 +560,7 @@ void UnityAssertEqualIntArray(UNITY_INTERNAL_PTR expected,
         case UNITY_DISPLAY_STYLE_UINT16:
             while (elements--)
             {
-            	Unity.CurrentTestFailed = (*(UNITY_PTR_ATTRIBUTE const _US16*)ptr_exp != *(UNITY_PTR_ATTRIBUTE const _US16*)ptr_act);
-                if (Unity.CurrentTestFailed)
+                if (*(UNITY_PTR_ATTRIBUTE const _US16*)ptr_exp != *(UNITY_PTR_ATTRIBUTE const _US16*)ptr_act)
                 {
                     UnityTestResultsFailBegin(lineNumber);
                     UnityPrint(UnityStrElement);
@@ -584,8 +582,7 @@ void UnityAssertEqualIntArray(UNITY_INTERNAL_PTR expected,
         case UNITY_DISPLAY_STYLE_UINT64:
             while (elements--)
             {
-            	Unity.CurrentTestFailed = (*(UNITY_PTR_ATTRIBUTE const _US64*)ptr_exp != *(UNITY_PTR_ATTRIBUTE const _US64*)ptr_act);
-                if (Unity.CurrentTestFailed)
+                if (*(UNITY_PTR_ATTRIBUTE const _US64*)ptr_exp != *(UNITY_PTR_ATTRIBUTE const _US64*)ptr_act)
                 {
                     UnityTestResultsFailBegin(lineNumber);
                     UnityPrint(UnityStrElement);
@@ -605,8 +602,7 @@ void UnityAssertEqualIntArray(UNITY_INTERNAL_PTR expected,
         default:
             while (elements--)
             {
-            	Unity.CurrentTestFailed = (*(UNITY_PTR_ATTRIBUTE const _US32*)ptr_exp != *(UNITY_PTR_ATTRIBUTE const _US32*)ptr_act);
-                if (Unity.CurrentTestFailed);
+                if (*(UNITY_PTR_ATTRIBUTE const _US32*)ptr_exp != *(UNITY_PTR_ATTRIBUTE const _US32*)ptr_act)
                 {
                     UnityTestResultsFailBegin(lineNumber);
                     UnityPrint(UnityStrElement);
