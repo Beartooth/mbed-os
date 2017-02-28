@@ -1,6 +1,3 @@
-
-/** \addtogroup frameworks */
-/** @{*/
 /* ==========================================
     Unity Project - A Test Framework for C
     Copyright (c) 2007-14 Mike Karlesky, Mark VanderVoord, Greg Williams
@@ -16,11 +13,6 @@ extern "C"
 {
 #endif
 
-// support 64bit integers
-#define UNITY_SUPPORT_64
-// support double precision floating point
-#define UNITY_INCLUDE_DOUBLE
-
 #include "unity_internals.h"
 
 void setUp(void);
@@ -30,44 +22,36 @@ void tearDown(void);
  * Configuration Options
  *-------------------------------------------------------
  * All options described below should be passed as a compiler flag to all files using Unity. If you must add #defines, place them BEFORE the #include above.
-
  * Integers/longs/pointers
  *     - Unity attempts to automatically discover your integer sizes
  *       - define UNITY_EXCLUDE_STDINT_H to stop attempting to look in <stdint.h>
  *       - define UNITY_EXCLUDE_LIMITS_H to stop attempting to look in <limits.h>
- *       - define UNITY_EXCLUDE_SIZEOF to stop attempting to use sizeof in macros
  *     - If you cannot use the automatic methods above, you can force Unity by using these options:
  *       - define UNITY_SUPPORT_64
- *       - define UNITY_INT_WIDTH
- *       - UNITY_LONG_WIDTH
- *       - UNITY_POINTER_WIDTH
-
+ *       - set UNITY_INT_WIDTH
+ *       - set UNITY_LONG_WIDTH
+ *       - set UNITY_POINTER_WIDTH
  * Floats
  *     - define UNITY_EXCLUDE_FLOAT to disallow floating point comparisons
  *     - define UNITY_FLOAT_PRECISION to specify the precision to use when doing TEST_ASSERT_EQUAL_FLOAT
  *     - define UNITY_FLOAT_TYPE to specify doubles instead of single precision floats
- *     - define UNITY_FLOAT_VERBOSE to print floating point values in errors (uses sprintf)
  *     - define UNITY_INCLUDE_DOUBLE to allow double floating point comparisons
  *     - define UNITY_EXCLUDE_DOUBLE to disallow double floating point comparisons (default)
  *     - define UNITY_DOUBLE_PRECISION to specify the precision to use when doing TEST_ASSERT_EQUAL_DOUBLE
  *     - define UNITY_DOUBLE_TYPE to specify something other than double
- *     - define UNITY_DOUBLE_VERBOSE to print floating point values in errors (uses sprintf)
- *     - define UNITY_VERBOSE_NUMBER_MAX_LENGTH to change maximum length of printed numbers (used by sprintf)
-
+ *     - define UNITY_EXCLUDE_FLOAT_PRINT to trim binary size, won't print floating point values in errors
  * Output
  *     - by default, Unity prints to standard out with putchar.  define UNITY_OUTPUT_CHAR(a) with a different function if desired
  *     - define UNITY_DIFFERENTIATE_FINAL_FAIL to print FAILED (vs. FAIL) at test end summary - for automated search for failure
-
  * Optimization
  *     - by default, line numbers are stored in unsigned shorts.  Define UNITY_LINE_TYPE with a different type if your files are huge
  *     - by default, test and failure counters are unsigned shorts.  Define UNITY_COUNTER_TYPE with a different type if you want to save space or have more than 65535 Tests.
-
  * Test Cases
  *     - define UNITY_SUPPORT_TEST_CASES to include the TEST_CASE macro, though really it's mostly about the runner generator script
-
  * Parameterized Tests
  *     - you'll want to create a define of TEST_CASE(...) which basically evaluates to nothing
-
+ * Tests with Arguments
+ *     - you'll want to define UNITY_USE_COMMAND_LINE_ARGS if you have the test runner passing arguments to Unity
  *-------------------------------------------------------
  * Basic Fail and Ignore
  *-------------------------------------------------------*/
@@ -80,7 +64,7 @@ void tearDown(void);
 
 /* It is not necessary for you to call PASS. A PASS condition is assumed if nothing fails.
  * This method allows you to abort a test immediately with a PASS state, ignoring the remainder of the test. */
-#define TEST_PASS()                                                                                longjmp(Unity.AbortFrame, 1)
+#define TEST_PASS()                                                                                TEST_ABORT()
 
 /*-------------------------------------------------------
  * Test Asserts (simple)
@@ -113,10 +97,10 @@ void tearDown(void);
 #define TEST_ASSERT_EQUAL_HEX32(expected, actual)                                                  UNITY_TEST_ASSERT_EQUAL_HEX32((expected), (actual), __LINE__, NULL)
 #define TEST_ASSERT_EQUAL_HEX64(expected, actual)                                                  UNITY_TEST_ASSERT_EQUAL_HEX64((expected), (actual), __LINE__, NULL)
 #define TEST_ASSERT_BITS(mask, expected, actual)                                                   UNITY_TEST_ASSERT_BITS((mask), (expected), (actual), __LINE__, NULL)
-#define TEST_ASSERT_BITS_HIGH(mask, actual)                                                        UNITY_TEST_ASSERT_BITS((mask), (_UU32)(-1), (actual), __LINE__, NULL)
-#define TEST_ASSERT_BITS_LOW(mask, actual)                                                         UNITY_TEST_ASSERT_BITS((mask), (_UU32)(0), (actual), __LINE__, NULL)
-#define TEST_ASSERT_BIT_HIGH(bit, actual)                                                          UNITY_TEST_ASSERT_BITS(((_UU32)1 << (bit)), (_UU32)(-1), (actual), __LINE__, NULL)
-#define TEST_ASSERT_BIT_LOW(bit, actual)                                                           UNITY_TEST_ASSERT_BITS(((_UU32)1 << (bit)), (_UU32)(0), (actual), __LINE__, NULL)
+#define TEST_ASSERT_BITS_HIGH(mask, actual)                                                        UNITY_TEST_ASSERT_BITS((mask), (UNITY_UINT32)(-1), (actual), __LINE__, NULL)
+#define TEST_ASSERT_BITS_LOW(mask, actual)                                                         UNITY_TEST_ASSERT_BITS((mask), (UNITY_UINT32)(0), (actual), __LINE__, NULL)
+#define TEST_ASSERT_BIT_HIGH(bit, actual)                                                          UNITY_TEST_ASSERT_BITS(((UNITY_UINT32)1 << (bit)), (UNITY_UINT32)(-1), (actual), __LINE__, NULL)
+#define TEST_ASSERT_BIT_LOW(bit, actual)                                                           UNITY_TEST_ASSERT_BITS(((UNITY_UINT32)1 << (bit)), (UNITY_UINT32)(0), (actual), __LINE__, NULL)
 
 /* Integer Ranges (of all sizes) */
 #define TEST_ASSERT_INT_WITHIN(delta, expected, actual)                                            UNITY_TEST_ASSERT_INT_WITHIN((delta), (expected), (actual), __LINE__, NULL)
@@ -218,10 +202,10 @@ void tearDown(void);
 #define TEST_ASSERT_EQUAL_HEX32_MESSAGE(expected, actual, message)                                 UNITY_TEST_ASSERT_EQUAL_HEX32((expected), (actual), __LINE__, (message))
 #define TEST_ASSERT_EQUAL_HEX64_MESSAGE(expected, actual, message)                                 UNITY_TEST_ASSERT_EQUAL_HEX64((expected), (actual), __LINE__, (message))
 #define TEST_ASSERT_BITS_MESSAGE(mask, expected, actual, message)                                  UNITY_TEST_ASSERT_BITS((mask), (expected), (actual), __LINE__, (message))
-#define TEST_ASSERT_BITS_HIGH_MESSAGE(mask, actual, message)                                       UNITY_TEST_ASSERT_BITS((mask), (_UU32)(-1), (actual), __LINE__, (message))
-#define TEST_ASSERT_BITS_LOW_MESSAGE(mask, actual, message)                                        UNITY_TEST_ASSERT_BITS((mask), (_UU32)(0), (actual), __LINE__, (message))
-#define TEST_ASSERT_BIT_HIGH_MESSAGE(bit, actual, message)                                         UNITY_TEST_ASSERT_BITS(((_UU32)1 << (bit)), (_UU32)(-1), (actual), __LINE__, (message))
-#define TEST_ASSERT_BIT_LOW_MESSAGE(bit, actual, message)                                          UNITY_TEST_ASSERT_BITS(((_UU32)1 << (bit)), (_UU32)(0), (actual), __LINE__, (message))
+#define TEST_ASSERT_BITS_HIGH_MESSAGE(mask, actual, message)                                       UNITY_TEST_ASSERT_BITS((mask), (UNITY_UINT32)(-1), (actual), __LINE__, (message))
+#define TEST_ASSERT_BITS_LOW_MESSAGE(mask, actual, message)                                        UNITY_TEST_ASSERT_BITS((mask), (UNITY_UINT32)(0), (actual), __LINE__, (message))
+#define TEST_ASSERT_BIT_HIGH_MESSAGE(bit, actual, message)                                         UNITY_TEST_ASSERT_BITS(((UNITY_UINT32)1 << (bit)), (UNITY_UINT32)(-1), (actual), __LINE__, (message))
+#define TEST_ASSERT_BIT_LOW_MESSAGE(bit, actual, message)                                          UNITY_TEST_ASSERT_BITS(((UNITY_UINT32)1 << (bit)), (UNITY_UINT32)(0), (actual), __LINE__, (message))
 
 /* Integer Ranges (of all sizes) */
 #define TEST_ASSERT_INT_WITHIN_MESSAGE(delta, expected, actual, message)                           UNITY_TEST_ASSERT_INT_WITHIN((delta), (expected), (actual), __LINE__, (message))
@@ -297,5 +281,3 @@ void tearDown(void);
 }
 #endif
 #endif
-
-/** @}*/
