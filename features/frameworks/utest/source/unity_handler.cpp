@@ -20,6 +20,7 @@
 #include "utest/utest_stack_trace.h"
 #include "utest/unity_handler.h"
 #include "greentea-client/greentea_serial.h"
+#include "console/segger/RTT/SEGGER_RTT.h"
 
 void utest_unity_assert_failure(void)
 {
@@ -35,7 +36,7 @@ void utest_unity_ignore_failure(void)
 
 void utest_safe_putc(int chr)
 {
-    greentea_serial->putc(chr);
+    SEGGER_RTT_Write(0, &chr, 1);
 }    
 
 
