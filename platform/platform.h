@@ -25,6 +25,7 @@
 #include <cstring>
 
 #include "platform/mbed_retarget.h"
+
 #include "platform/mbed_toolchain.h"
 #include "device.h"
 #include "PinNames.h"

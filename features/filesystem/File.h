@@ -14,11 +14,10 @@
  * limitations under the License.
  */
 
-#ifndef FILE_H
-#define FILE_H
 
-#include "filesystem/FileSystem.h"
-#include "platform/FileHandle.h"
+#include "platform/mbed_toolchain.h"
+#include "drivers/FileBase.h"
+
 
 namespace mbed {
 /** \addtogroup filesystem */
