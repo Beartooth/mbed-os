@@ -41,7 +41,7 @@ public:
      * @param data Data to be pushed to the buffer
      */
     void push(const T& data) {
-        core_util_critical_section_enter();
+//        core_util_critical_section_enter();
         if (full()) {
             _tail++;
             _tail %= BufferSize;
@@ -51,7 +51,7 @@ public:
         if (_head == _tail) {
             _full = true;
         }
-        core_util_critical_section_exit();
+//        core_util_critical_section_exit();
     }
 
     /** Pop the transaction from the buffer
@@ -61,14 +61,14 @@ public:
      */
     bool pop(T& data) {
         bool data_popped = false;
-        core_util_critical_section_enter();
+//        core_util_critical_section_enter();
         if (!empty()) {
             data = _pool[_tail++];
             _tail %= BufferSize;
             _full = false;
             data_popped = true;
         }
-        core_util_critical_section_exit();
+//        core_util_critical_section_exit();
         return data_popped;
     }
 
@@ -77,9 +77,9 @@ public:
      * @return True if the buffer is empty, false if not
      */
     bool empty() {
-        core_util_critical_section_enter();
+//        core_util_critical_section_enter();
         bool is_empty = (_head == _tail) && !_full;
-        core_util_critical_section_exit();
+//        core_util_critical_section_exit();
         return is_empty;
     }
 
@@ -88,9 +88,9 @@ public:
      * @return True if the buffer is full, false if not
      */
     bool full() {
-        core_util_critical_section_enter();
+//        core_util_critical_section_enter();
         bool full = _full;
-        core_util_critical_section_exit();
+//        core_util_critical_section_exit();
         return full;
     }
 
@@ -98,11 +98,11 @@ public:
      *
      */
     void reset() {
-        core_util_critical_section_enter();
+//        core_util_critical_section_enter();
         _head = 0;
         _tail = 0;
         _full = false;
-        core_util_critical_section_exit();
+//        core_util_critical_section_exit();
     }
 
 private:
