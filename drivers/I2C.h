@@ -18,7 +18,7 @@
 
 #include "platform/platform.h"
 
-#if DEVICE_I2C
+#if defined (DEVICE_I2C) || defined(DOXYGEN_ONLY)
 
 #include "hal/i2c_api.h"
 #include "platform/SingletonPtr.h"
@@ -32,11 +32,10 @@
 
 namespace mbed {
 /** \addtogroup drivers */
-/** @{*/
 
 /** An I2C Master, used for communicating with I2C slave devices
  *
- * @Note Synchronization level: Thread safe
+ * @note Synchronization level: Thread safe
  *
  * Example:
  * @code
@@ -52,6 +51,7 @@ namespace mbed {
  *     i2c.read(address, data, 2);
  * }
  * @endcode
+ * @ingroup drivers
  */
 class I2C {
 
@@ -117,8 +117,8 @@ public:
      *  @param repeated Repeated start, true - do not send stop at end
      *
      *  @returns
-     *      0 or non-zero - written number of bytes,
-     *      negative - I2C_ERROR_XXX status
+     *       0 on success (ack),
+     *   non-0 on failure (nack)
      */
     int write(int address, const char *data, int length, bool repeated = false);
 
@@ -194,5 +194,3 @@ protected:
 #endif
 
 #endif
-
-/** @}*/

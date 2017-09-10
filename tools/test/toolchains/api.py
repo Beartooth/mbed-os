@@ -4,15 +4,15 @@ import os
 from string import printable
 from copy import deepcopy
 from mock import MagicMock, patch
-from hypothesis import given
-from hypothesis.strategies import text, lists, fixed_dictionaries
+from hypothesis import given, settings
+from hypothesis.strategies import text, lists, fixed_dictionaries, booleans
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..",
                                     ".."))
 sys.path.insert(0, ROOT)
 
 from tools.toolchains import TOOLCHAIN_CLASSES, LEGACY_TOOLCHAIN_NAMES,\
-    Resources
+    Resources, TOOLCHAIN_PATHS
 from tools.targets import TARGET_MAP
 
 def test_instantiation():
@@ -42,6 +42,7 @@ def test_toolchain_profile_c(profile, source_file):
             toolchain = tc_class(TARGET_MAP["K64F"], build_profile=profile)
             toolchain.inc_md5 = ""
             toolchain.build_dir = ""
+            toolchain.config = MagicMock(app_config_location=None)
             compile_command = toolchain.compile_command(to_compile,
                                                         to_compile + ".o", [])
             for parameter in profile['c'] + profile['common']:
@@ -67,6 +68,7 @@ def test_toolchain_profile_cpp(profile, source_file):
             toolchain = tc_class(TARGET_MAP["K64F"], build_profile=profile)
             toolchain.inc_md5 = ""
             toolchain.build_dir = ""
+            toolchain.config = MagicMock(app_config_location=None)
             compile_command = toolchain.compile_command(to_compile,
                                                         to_compile + ".o", [])
             for parameter in profile['cxx'] + profile['common']:
@@ -125,3 +127,21 @@ def test_detect_duplicates(filenames):
         assert "dupe.s" in notification["message"]
         assert "dupe.c" in notification["message"]
         assert "dupe.cpp" in notification["message"]
+
+@given(text(alphabet=ALPHABET + ["/"], min_size=1))
+@given(booleans())
+@given(booleans())
+@settings(max_examples=20)
+def test_path_specified_gcc(gcc_loc, exists_at_loc, exists_in_path):
+    with patch('tools.toolchains.gcc.exists') as _exists:
+        with patch('tools.toolchains.gcc.find_executable') as _find:
+            _exists.return_value = exists_at_loc
+            _find.return_value = exists_in_path
+            TOOLCHAIN_PATHS['GCC_ARM'] = gcc_loc
+            toolchain_class = TOOLCHAIN_CLASSES["GCC_ARM"]
+            found_p = toolchain_class.check_executable()
+            assert found_p == (exists_at_loc or exists_in_path)
+            if exists_at_loc:
+                assert TOOLCHAIN_PATHS['GCC_ARM'] == gcc_loc
+            elif exists_in_path:
+                assert TOOLCHAIN_PATHS['GCC_ARM'] == ''
