@@ -15,8 +15,8 @@
  */
 
 
-#include "platform/mbed_toolchain.h"
-#include "drivers/FileBase.h"
+#include "filesystem/FileSystem.h"
+#include "platform/FileHandle.h"
 
 
 namespace mbed {
