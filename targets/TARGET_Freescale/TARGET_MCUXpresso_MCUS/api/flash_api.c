@@ -62,10 +62,10 @@ int32_t flash_erase_sector(flash_t *obj, uint32_t address)
 
     /* We need to prevent flash accesses during erase operation */
     core_util_critical_section_enter();
-    status = FLASH_Erase(&obj->flash_config, address, obj->flash_config.PFlashSectorSize, kFLASH_ApiEraseKey);
+    status = FLASH_Erase(&obj->flash_config, address, obj->flash_config.PFlashSectorSize, kFLASH_apiEraseKey);
 
     if (status == kStatus_Success) {
-        status = FLASH_VerifyErase(&obj->flash_config, address, obj->flash_config.PFlashSectorSize, kFLASH_MarginValueNormal);
+        status = FLASH_VerifyErase(&obj->flash_config, address, obj->flash_config.PFlashSectorSize, kFLASH_marginValueNormal);
     }
     core_util_critical_section_exit();
 
@@ -87,7 +87,7 @@ int32_t flash_program_page(flash_t *obj, uint32_t address, const uint8_t *data, 
     if (status == kStatus_Success) {
         // Must use kFlashMargin_User, or kFlashMargin_Factory for verify program
         status = FLASH_VerifyProgram(&obj->flash_config, address, size,
-                              (uint32_t *)data, kFLASH_MarginValueUser,
+                              (uint32_t *)data, kFLASH_marginValueUser,
                               NULL, NULL);
     }
     core_util_critical_section_exit();
@@ -102,11 +102,11 @@ uint32_t flash_get_sector_size(const flash_t *obj, uint32_t address)
     uint32_t devicesize = 0;
     uint32_t startaddr = 0;
 
-    FLASH_GetProperty((flash_config_t *)&obj->flash_config, kFLASH_PropertyPflashBlockBaseAddr, &startaddr);
-    FLASH_GetProperty((flash_config_t *)&obj->flash_config, kFLASH_PropertyPflashTotalSize, &devicesize);
+    FLASH_GetProperty((flash_config_t *)&obj->flash_config, kFLASH_propertyPflashBlockBaseAddr, &startaddr);
+    FLASH_GetProperty((flash_config_t *)&obj->flash_config, kFLASH_propertyPflashTotalSize, &devicesize);
 
     if ((address >= startaddr) && (address < (startaddr + devicesize))) {
-        FLASH_GetProperty((flash_config_t *)&obj->flash_config, kFLASH_PropertyPflashSectorSize, &sectorsize);
+        FLASH_GetProperty((flash_config_t *)&obj->flash_config, kFLASH_propertyPflashSectorSize, &sectorsize);
     }
 
     return sectorsize;
@@ -121,7 +121,7 @@ uint32_t flash_get_start_address(const flash_t *obj)
 {
     uint32_t startaddr = 0;
 
-    FLASH_GetProperty((flash_config_t *)&obj->flash_config, kFLASH_PropertyPflashBlockBaseAddr, &startaddr);
+    FLASH_GetProperty((flash_config_t *)&obj->flash_config, kFLASH_propertyPflashBlockBaseAddr, &startaddr);
 
     return startaddr;
 }
@@ -130,7 +130,7 @@ uint32_t flash_get_size(const flash_t *obj)
 {
     uint32_t devicesize = 0;
 
-    FLASH_GetProperty((flash_config_t *)&obj->flash_config, kFLASH_PropertyPflashTotalSize, &devicesize);
+    FLASH_GetProperty((flash_config_t *)&obj->flash_config, kFLASH_propertyPflashTotalSize, &devicesize);
 
     return devicesize;
 }
