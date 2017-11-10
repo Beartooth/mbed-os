@@ -35,6 +35,13 @@
 #define SPI_FILL_WORD         (0xFFFF)
 #define SPI_FILL_CHAR         (0xFF)
 
+typedef enum {
+    RxDrainIrq,
+    TxFillIrq,
+} SpiIrq;
+
+typedef void (*spi_isr)(uint32_t id, SpiIrq event);
+
 #if DEVICE_SPI_ASYNCH
 /** Asynch SPI HAL structure
  */
@@ -103,21 +110,75 @@ void spi_format(spi_t *obj, int bits, int mode, int slave);
  */
 void spi_frequency(spi_t *obj, int hz);
 
+/** Check if a value is available to read
+ *
+ * @param[in] obj   The SPI peripheral to check
+ * @return non-zero if a value is available
+ */
+int spi_readable(spi_t *obj);
+
+/** Check if a space available to write a value
+ *
+ * @param[in] obj   The SPI peripheral to check
+ * @return non-zero if there is space available to write 1 value
+ */
+int spi_writable(spi_t *obj);
+
 /**@}*/
 /**
  * \defgroup SynchSPI Synchronous SPI Hardware Abstraction Layer
  * @{
  */
 
-/** Write a byte out in master mode and receive a value
+/** Write a single value out in master mode
  *
  * @param[in] obj   The SPI peripheral to use for sending
  * @param[in] value The value to send
- * @return Returns the value received during send
  */
-int  spi_master_write(spi_t *obj, int value);
+void spi_master_write(spi_t *obj, int value);
 
-/** Write a block out in master mode and receive a value
+
+/** Read a single value out in master mode
+ *
+ * @param[in] obj   The SPI peripheral to use for reading
+ * @return value read from SPI
+ */
+int spi_master_read(spi_t *obj);
+
+/** Transfer single value over master spi
+ *
+ * @param obj       The spi peripheral
+ * @param value     The value to transfer
+ * @return The value received during transfer
+ */
+int spi_master_transfer(spi_t *obj, int value);
+
+/** Write a block out in master mode
+ *
+ *  The total number of bytes sent and recieved will be the maximum of
+ *  tx_length and rx_length. The bytes written will be padded with the
+ *  value 0xff.
+ *
+ * @param[in] obj        The SPI peripheral to use for sending
+ * @param[in] buffer  Pointer to the byte-array of data to write to the device
+ * @param[in] length  Number of bytes to write
+ * @returns
+ *      The number of bytes written and read from the device. This is
+ *      maximum of tx_length and rx_length.
+ */
+int spi_master_block_write(spi_t *obj, const char *buffer, int length);
+
+/** Read a block out in master mode
+ *
+ * @param[in] obj        The SPI peripheral to use for reading
+ * @param[in] buffer     Pointer to the byte-array of data to read into
+ * @param[in] length     Number of bytes to read
+ * @param[in] write_fill Default data transmitted while performing a read
+ * @return Number of bytes read
+ */
+int spi_master_block_read(spi_t *obj, char *buffer, int length);
+
+/** Transfer multiple values in master mode
  *
  *  The total number of bytes sent and recieved will be the maximum of
  *  tx_length and rx_length. The bytes written will be padded with the
@@ -133,14 +194,7 @@ int  spi_master_write(spi_t *obj, int value);
  *      The number of bytes written and read from the device. This is
  *      maximum of tx_length and rx_length.
  */
-int spi_master_block_write(spi_t *obj, const char *tx_buffer, int tx_length, char *rx_buffer, int rx_length, char write_fill);
-
-/** Check if a value is available to read
- *
- * @param[in] obj The SPI peripheral to check
- * @return non-zero if a value is available
- */
-int  spi_slave_receive(spi_t *obj);
+int spi_master_block_transfer(spi_t *obj, const char *tx_buffer, int tx_length, char *rx_buffer, int rx_length);
 
 /** Get a received value out of the SPI receive buffer in slave mode
  *
@@ -148,7 +202,7 @@ int  spi_slave_receive(spi_t *obj);
  * @param[in] obj The SPI peripheral to read
  * @return The value received
  */
-int  spi_slave_read(spi_t *obj);
+int spi_slave_read(spi_t *obj);
 
 /** Write a value to the SPI peripheral in slave mode
  *
@@ -158,12 +212,56 @@ int  spi_slave_read(spi_t *obj);
  */
 void spi_slave_write(spi_t *obj, int value);
 
+/** Transfer single value over slave spi
+ *
+ * @param obj       The spi peripheral
+ * @param value     The value to transfer
+ * @param blocking  Set to non-zero to wait for transfer complete, or zero for no wait
+ * @return          The value received during transfer, ignore if not blocking
+ */
+int spi_slave_transfer(spi_t *obj, int value);
+
+/** Write multiple values over slave spi
+ *
+ * Blocks until write is complete
+ * @param obj       The SPI peripheral
+ * @param buffer    The buffer of values to write
+ * @param length    Number of bytes to write
+ * @return number of bytes written
+ */
+int spi_slave_block_write(spi_t *obj, const char *buffer, int length);
+
+/** Read multiple values over slave spi
+ *
+ * Blocks until read is complete
+ * @param obj       The SPI peripheral
+ * @param buffer    The buffer to read values into
+ * @param length    The number of bytes to read
+ * @return number of bytes read
+ */
+int spi_slave_block_read(spi_t *obj, char *buffer, int length);
+
+/** Transfer multiple values over slave spi
+ *
+ * Blocks until transfer is complete
+ * @param[in]   obj           The SPI peripheral to use for sending
+ * @param[in]   tx_buffer     Pointer to buffer of data to write
+ * @param[in]   tx_length     Number of bytes to write
+ * @param[out]  rx_buffer     Pointer to buffer of data to read, NULL if not blocking
+ * @param[in]   rx_length     Number of bytes to read, 0 if not blocking
+ * @param[in]   write_fill    Default data transmitted while performing a read
+ * @param[in]   blocking      Set to non-zero to waif for transfer complete, or zero for no wait
+ * @return number of bytes transferred
+ */
+int spi_slave_block_transfer(spi_t *obj, const char *tx_buffer, int tx_length, char *rx_buffer, int rx_length);
+
+
 /** Checks if the specified SPI peripheral is in use
  *
  * @param[in] obj The SPI peripheral to check
  * @return non-zero if the peripheral is currently transmitting
  */
-int  spi_busy(spi_t *obj);
+int spi_busy(spi_t *obj);
 
 /** Get the module number
  *
@@ -171,6 +269,32 @@ int  spi_busy(spi_t *obj);
  * @return The module number
  */
 uint8_t spi_get_module(spi_t *obj);
+
+/** Configure an spi interrupt
+ *
+ * @param obj       The SPI peripheral
+ * @param irq       The IRQ type ()
+ * @param enable    Set to non-zero to enable events, or zero to disable them
+ */
+void spi_irq_set(spi_t *obj, SpiIrq irq, uint32_t enable);
+
+/** Get config for spi interrupt
+ *
+ * @param obj       The SPI peripheral
+ * @param irq       The IRQ type
+ * @return non-zero if enabled, or zero if disabled
+ */
+uint32_t spi_irq_get(spi_t *obj, SpiIrq irq);
+
+/** The spi interrupt handler registration
+ *
+ * @param obj       The spi peripheral
+ * @param handler   The interrupt handler which will be invoked when the interrupt fires
+ * @param id        The SPIBase object
+ */
+void spi_irq_handler(spi_t *obj, spi_isr handler, uint32_t id);
+
+
 
 /**@}*/
 

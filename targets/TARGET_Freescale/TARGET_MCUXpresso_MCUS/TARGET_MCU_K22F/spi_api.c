@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 #include <math.h>
+#include <TARGET_MCUXpresso_MCUS/TARGET_MCU_K22F/TARGET_MCU_K22F512/device/cmsis.h>
 #include "mbed_assert.h"
 
 #include "spi_api.h"
@@ -27,13 +28,21 @@
 #include "peripheral_clock_defines.h"
 #include "PeripheralPins.h"
 
+
 /* Array of SPI peripheral base address. */
 static SPI_Type *const spi_address[] = SPI_BASE_PTRS;
 /* Array of SPI bus clock frequencies */
 static clock_name_t const spi_clocks[] = SPI_CLOCK_FREQS;
+/* Irq handler */
+static spi_isr irq_handler;
+/* nvic irq names */
+static IRQn_Type spi_irqs[] = SPI_IRQS;
 
-void spi_init(spi_t *obj, PinName mosi, PinName miso, PinName sclk, PinName ssel)
-{
+/* unique id's for irq handlers */
+static uint32_t spi_irq_ids[FSL_FEATURE_SOC_DSPI_COUNT] = {0};
+
+
+void spi_init(spi_t *obj, PinName mosi, PinName miso, PinName sclk, PinName ssel) {
     // determine the SPI to use
     uint32_t spi_mosi = pinmap_peripheral(mosi, PinMap_SPI_MOSI);
     uint32_t spi_miso = pinmap_peripheral(miso, PinMap_SPI_MISO);
@@ -43,7 +52,7 @@ void spi_init(spi_t *obj, PinName mosi, PinName miso, PinName sclk, PinName ssel
     uint32_t spi_cntl = pinmap_merge(spi_sclk, spi_ssel);
 
     obj->instance = pinmap_merge(spi_data, spi_cntl);
-    MBED_ASSERT((int)obj->instance != NC);
+    MBED_ASSERT((int) obj->instance != NC);
 
     // pin out the spi pins
     pinmap_pinout(mosi, PinMap_SPI_MOSI);
@@ -52,15 +61,14 @@ void spi_init(spi_t *obj, PinName mosi, PinName miso, PinName sclk, PinName ssel
     if (ssel != NC) {
         pinmap_pinout(ssel, PinMap_SPI_SSEL);
     }
+    obj->fill = SPI_FILL_CHAR;
 }
 
-void spi_free(spi_t *obj)
-{
+void spi_free(spi_t *obj) {
     DSPI_Deinit(spi_address[obj->instance]);
 }
 
-void spi_format(spi_t *obj, int bits, int mode, int slave)
-{
+void spi_format(spi_t *obj, int bits, int mode, int slave) {
     dspi_master_config_t master_config;
     dspi_slave_config_t slave_config;
 
@@ -68,7 +76,7 @@ void spi_format(spi_t *obj, int bits, int mode, int slave)
         /* Slave config */
         DSPI_SlaveGetDefaultConfig(&slave_config);
         slave_config.whichCtar = kDSPI_Ctar0;
-        slave_config.ctarConfig.bitsPerFrame = (uint32_t)bits;;
+        slave_config.ctarConfig.bitsPerFrame = (uint32_t) bits;;
         slave_config.ctarConfig.cpol = (mode & 0x2) ? kDSPI_ClockPolarityActiveLow : kDSPI_ClockPolarityActiveHigh;
         slave_config.ctarConfig.cpha = (mode & 0x1) ? kDSPI_ClockPhaseSecondEdge : kDSPI_ClockPhaseFirstEdge;
 
@@ -76,7 +84,7 @@ void spi_format(spi_t *obj, int bits, int mode, int slave)
     } else {
         /* Master config */
         DSPI_MasterGetDefaultConfig(&master_config);
-        master_config.ctarConfig.bitsPerFrame = (uint32_t)bits;;
+        master_config.ctarConfig.bitsPerFrame = (uint32_t) bits;;
         master_config.ctarConfig.cpol = (mode & 0x2) ? kDSPI_ClockPolarityActiveLow : kDSPI_ClockPolarityActiveHigh;
         master_config.ctarConfig.cpha = (mode & 0x1) ? kDSPI_ClockPhaseSecondEdge : kDSPI_ClockPhaseFirstEdge;
         master_config.ctarConfig.direction = kDSPI_MsbFirst;
@@ -86,59 +94,111 @@ void spi_format(spi_t *obj, int bits, int mode, int slave)
     }
 }
 
-void spi_frequency(spi_t *obj, int hz)
-{
+void spi_frequency(spi_t *obj, int hz) {
     uint32_t busClock = CLOCK_GetFreq(spi_clocks[obj->instance]);
-    DSPI_MasterSetBaudRate(spi_address[obj->instance], kDSPI_Ctar0, (uint32_t)hz, busClock);
+    DSPI_MasterSetBaudRate(spi_address[obj->instance], kDSPI_Ctar0, (uint32_t) hz, busClock);
     //Half clock period delay after SPI transfer
     DSPI_MasterSetDelayTimes(spi_address[obj->instance], kDSPI_Ctar0, kDSPI_LastSckToPcs, busClock, 500000000 / hz);
 }
 
-static inline int spi_readable(spi_t * obj)
-{
-    return (DSPI_GetStatusFlags(spi_address[obj->instance]) & kDSPI_RxFifoDrainRequestFlag);
+int spi_readable(spi_t *obj) {
+    return (int) (DSPI_GetStatusFlags(spi_address[obj->instance]) & kDSPI_RxFifoDrainRequestFlag);
 }
 
-int spi_master_write(spi_t *obj, int value)
-{
+int spi_writable(spi_t *obj) {
+    return (int) (DSPI_GetStatusFlags(spi_address[obj->instance]) & kDSPI_TxFifoFillRequestFlag);
+}
+
+void spi_master_write(spi_t *obj, int value) {
+    spi_master_transfer(obj, value);
+}
+
+int spi_master_read(spi_t *obj) {
+    return spi_master_transfer(obj, obj->fill);
+}
+
+int spi_master_transfer(spi_t *obj, int value) {
     dspi_command_data_config_t command;
     uint32_t rx_data;
     DSPI_GetDefaultDataCommandConfig(&command);
     command.isEndOfQueue = true;
 
-    DSPI_MasterWriteDataBlocking(spi_address[obj->instance], &command, (uint16_t)value);
+    DSPI_StopTransfer(spi_address[obj->instance]);
+    DSPI_ClearStatusFlags(spi_address[obj->instance], kDSPI_EndOfQueueFlag);
+    DSPI_StartTransfer(spi_address[obj->instance]);
 
-    DSPI_ClearStatusFlags(spi_address[obj->instance], kDSPI_TxFifoFillRequestFlag);
+    while (!spi_writable(obj));
+    DSPI_MasterWriteData(spi_address[obj->instance], &command, (uint16_t) value);
 
-    // wait rx buffer full
+    DSPI_ClearStatusFlags(spi_address[obj->instance], kDSPI_TxFifoFillRequestFlag | kDSPI_EndOfQueueFlag);
+
     while (!spi_readable(obj));
     rx_data = DSPI_ReadData(spi_address[obj->instance]);
-    DSPI_ClearStatusFlags(spi_address[obj->instance], kDSPI_RxFifoDrainRequestFlag | kDSPI_EndOfQueueFlag);
-    return rx_data & 0xffff;
+    DSPI_ClearStatusFlags(spi_address[obj->instance], kDSPI_RxFifoDrainRequestFlag);
+
+    while (!(DSPI_GetStatusFlags(spi_address[obj->instance]) & kDSPI_EndOfQueueFlag));
+
+    DSPI_ClearStatusFlags(spi_address[obj->instance], kDSPI_TxFifoFillRequestFlag | kDSPI_EndOfQueueFlag);
+
+    DSPI_StopTransfer(spi_address[obj->instance]);
+
+    return (int) (rx_data & 0xffff);
 }
 
-int spi_master_block_write(spi_t *obj, const char *tx_buffer, int tx_length,
-                           char *rx_buffer, int rx_length, char write_fill) {
+int spi_master_block_write(spi_t *obj, const char *buffer, int length) {
+    return spi_master_block_transfer(obj, buffer, length, NULL, 0);
+}
+
+int spi_master_block_read(spi_t *obj, char *buffer, int length) {
+    return spi_master_block_transfer(obj, NULL, 0, buffer, length);
+}
+
+int spi_master_block_transfer(spi_t *obj, const char *tx_buffer, int tx_length, char *rx_buffer, int rx_length) {
+    dspi_command_data_config_t command;
+    uint32_t rx_data;
     int total = (tx_length > rx_length) ? tx_length : rx_length;
+    DSPI_GetDefaultDataCommandConfig(&command);
+    command.isEndOfQueue = false;
+    command.isPcsContinuous = true;
+
+    if(tx_buffer == NULL && tx_length > 0) {
+        return -1;
+    }
+
+    if(rx_buffer == NULL && rx_buffer > 0) {
+        return -2;
+    }
+
+    DSPI_StopTransfer(spi_address[obj->instance]);
+    DSPI_ClearStatusFlags(spi_address[obj->instance], kDSPI_EndOfQueueFlag);
+    DSPI_StartTransfer(spi_address[obj->instance]);
 
     for (int i = 0; i < total; i++) {
-        char out = (i < tx_length) ? tx_buffer[i] : write_fill;
-        char in = spi_master_write(obj, out);
+        char out = (i < tx_length) ? tx_buffer[i] : obj->fill;
+        if (i == total - 1) {
+            command.isEndOfQueue = true;
+            command.isPcsContinuous = false;
+        }
+
+        while (!spi_writable(obj));
+        DSPI_MasterWriteData(spi_address[obj->instance], &command, (uint16_t) out);
+
         if (i < rx_length) {
-            rx_buffer[i] = in;
+            while (!spi_readable(obj));
+            rx_buffer[i] = (char) DSPI_ReadData(spi_address[obj->instance]);
         }
     }
+
+    while (!(DSPI_GetStatusFlags(spi_address[obj->instance]) & kDSPI_EndOfQueueFlag));
+
+    DSPI_ClearStatusFlags(spi_address[obj->instance], kDSPI_TxFifoFillRequestFlag | kDSPI_EndOfQueueFlag);
+
+    DSPI_StopTransfer(spi_address[obj->instance]);
 
     return total;
 }
 
-int spi_slave_receive(spi_t *obj)
-{
-    return spi_readable(obj);
-}
-
-int spi_slave_read(spi_t *obj)
-{
+int spi_slave_read(spi_t *obj) {
     uint32_t rx_data;
 
     while (!spi_readable(obj));
@@ -147,9 +207,157 @@ int spi_slave_read(spi_t *obj)
     return rx_data & 0xffff;
 }
 
-void spi_slave_write(spi_t *obj, int value)
-{
-    DSPI_SlaveWriteDataBlocking(spi_address[obj->instance], (uint32_t)value);
+void spi_slave_write(spi_t *obj, int value) {
+    while(!spi_writable(obj));
+    DSPI_SlaveWriteData(spi_address[obj->instance], (uint32_t) value);
+    DSPI_ClearStatusFlags(spi_address[obj->instance], kDSPI_TxFifoFillRequestFlag);
+}
+
+int spi_slave_transfer(spi_t *obj, int value) {
+    uint32_t rx_data = 0;
+
+    while (!spi_writable(obj));
+    DSPI_SlaveWriteData(spi_address[obj->instance], (uint32_t) value);
+
+    // wait rx buffer full
+    while (!spi_readable(obj));
+    rx_data = DSPI_ReadData(spi_address[obj->instance]);
+    DSPI_ClearStatusFlags(spi_address[obj->instance], kDSPI_RxFifoDrainRequestFlag);
+
+    return (int) (rx_data & 0xffff);
+}
+
+
+int spi_slave_block_transfer(spi_t *obj, const char *tx_buffer, int tx_length, char *rx_buffer, int rx_length) {
+    int total = (tx_length > rx_length) ? tx_length : rx_length;
+
+    if(tx_buffer == NULL && tx_length > 0) {
+        return -1;
+    }
+
+    if(rx_buffer == NULL && rx_buffer > 0) {
+        return -2;
+    }
+
+    DSPI_StopTransfer(spi_address[obj->instance]);
+    DSPI_ClearStatusFlags(spi_address[obj->instance], kDSPI_EndOfQueueFlag);
+    DSPI_StartTransfer(spi_address[obj->instance]);
+
+    for(int i = 0; i < total; i++) {
+        char out = (i < tx_length) ? tx_buffer[i] : obj->fill;
+        while(!spi_writable(obj));
+        DSPI_SlaveWriteData(spi_address[obj->instance], (uint32_t) out);
+
+        if(i < rx_length) {
+            while(!spi_readable(obj));
+            rx_buffer[i] = (char) DSPI_ReadData(spi_address[obj->instance]);
+        }
+    }
+
+    DSPI_ClearStatusFlags(spi_address[obj->instance], kDSPI_TxFifoFillRequestFlag | kDSPI_EndOfQueueFlag);
+
+    DSPI_StopTransfer(spi_address[obj->instance]);
+
+    return total;
+
+}
+
+
+void spi_irq(uint32_t tx_fill, uint32_t rx_drain, uint32_t index) {
+    SPI_Type *base = spi_address[index];
+
+    if (spi_irq_ids[index] != 0) {
+        if (tx_fill) {
+            irq_handler(spi_irq_ids[index], TxFillIrq);
+        }
+        if(rx_drain) {
+            irq_handler(spi_irq_ids[index], RxDrainIrq);
+        }
+    }
+}
+
+void spi0_irq() {
+    uint32_t status_flags = DSPI_GetStatusFlags(spi_address[0]);
+    spi_irq(status_flags & kDSPI_TxFifoFillRequestFlag,status_flags & kDSPI_RxFifoDrainRequestFlag, 0);
+
+}
+
+void spi1_irq() {
+    uint32_t status_flags = DSPI_GetStatusFlags(spi_address[1]);
+    spi_irq(status_flags & kDSPI_TxFifoFillRequestFlag,status_flags & kDSPI_RxFifoDrainRequestFlag, 1);
+}
+
+
+void spi_irq_set(spi_t *obj, SpiIrq irq, uint32_t enable) {
+    uint32_t vector = 0;
+
+    switch (obj->instance) {
+        case 0:
+            vector = (uint32_t) &spi0_irq;
+            break;
+        case 1:
+            vector = (uint32_t) &spi1_irq;
+            break;
+        default:
+            break;
+    }
+
+    if (enable) {
+        switch (irq) {
+            case RxDrainIrq:
+                DSPI_ClearStatusFlags(spi_address[obj->instance], kDSPI_RxFifoDrainRequestFlag);
+                DSPI_EnableInterrupts(spi_address[obj->instance], kDSPI_RxFifoDrainRequestInterruptEnable);
+                break;
+            case TxFillIrq:
+                DSPI_ClearStatusFlags(spi_address[obj->instance], kDSPI_TxFifoFillRequestFlag);
+                DSPI_EnableInterrupts(spi_address[obj->instance], kDSPI_TxFifoFillRequestInterruptEnable);
+                break;
+            default:
+                break;
+        }
+        NVIC_SetVector(spi_irqs[obj->instance], vector);
+        NVIC_EnableIRQ(spi_irqs[obj->instance]);
+    } else { // disable
+        bool all_disabled = 0;
+        SpiIrq other_irq;
+
+        switch (irq) {
+            case RxDrainIrq:
+                DSPI_DisableInterrupts(spi_address[obj->instance], kDSPI_RxFifoDrainRequestInterruptEnable);
+                break;
+            case TxFillIrq:
+                DSPI_DisableInterrupts(spi_address[obj->instance], kDSPI_TxFifoFillRequestInterruptEnable);
+                break;
+//            case TransferCompleteIrq:
+//                DSPI_DisableInterrupts(spi_address[obj->instance], kDSPI_TxCompleteInterruptEnable);
+//                all_disabled = true;
+//                break;
+            default:
+                break;
+        }
+        uint32_t enabled = DSPI_GetEnabledInterrupts(spi_address[obj->instance]);
+        all_disabled = !(enabled & (kDSPI_RxFifoDrainRequestInterruptEnable | kDSPI_TxFifoFillRequestInterruptEnable));
+        if (all_disabled) {
+            NVIC_DisableIRQ(spi_irqs[obj->instance]);
+        }
+    }
+}
+
+uint32_t spi_irq_get(spi_t *obj, SpiIrq irq) {
+    uint32_t enabledInterrupts = DSPI_GetEnabledInterrupts(spi_address[obj->instance]);
+    switch(irq) {
+        case RxDrainIrq:
+            return enabledInterrupts & kDSPI_RxFifoDrainRequestInterruptEnable;
+        case TxFillIrq:
+            return enabledInterrupts & kDSPI_TxFifoFillRequestInterruptEnable;
+        default:
+            return 0;
+    }
+}
+
+void spi_irq_handler(spi_t *obj, spi_isr handler, uint32_t id) {
+    irq_handler = handler;
+    spi_irq_ids[obj->instance] = id;
 }
 
 #endif

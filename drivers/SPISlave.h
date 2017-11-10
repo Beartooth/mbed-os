@@ -21,7 +21,7 @@
 
 #if defined (DEVICE_SPISLAVE) || defined(DOXYGEN_ONLY)
 
-#include "hal/spi_api.h"
+#include "drivers/SPIBase.h"
 
 namespace mbed {
 /** \addtogroup drivers */
@@ -53,7 +53,7 @@ namespace mbed {
  * @endcode
  * @ingroup drivers
  */
-class SPISlave : private NonCopyable<SPISlave> {
+class SPISlave : public SPIBase {
 
 public:
 
@@ -68,27 +68,6 @@ public:
      */
     SPISlave(PinName mosi, PinName miso, PinName sclk, PinName ssel);
 
-    /** Configure the data transmission format
-     *
-     *  @param bits Number of bits per SPI frame (4 - 16)
-     *  @param mode Clock polarity and phase mode (0 - 3)
-     *
-     * @code
-     * mode | POL PHA
-     * -----+--------
-     *   0  |  0   0
-     *   1  |  0   1
-     *   2  |  1   0
-     *   3  |  1   1
-     * @endcode
-     */
-    void format(int bits, int mode = 0);
-
-    /** Set the spi bus clock frequency
-     *
-     *  @param hz SCLK frequency in hz (default = 1MHz)
-     */
-    void frequency(int hz = 1000000);
 
     /** Polls the SPI to see if data has been received
      *
@@ -105,19 +84,36 @@ public:
      */
     int read(void);
 
+    /** Write data to spi
+     *
+     * @param value     Data to write to spi
+     */
+    void write(int value);
+
     /** Fill the transmission buffer with the value to be written out
      *  as slave on the next received message from the master.
      *
      *  @param value the data to be transmitted next
+     *  @return read value received duriing transfer, ignore if not blocking
      */
-    void reply(int value);
+    virtual int transfer(int value);
 
-protected:
-    spi_t _spi;
+    /** Write to the SPI Slave and obtain the response
+     *
+     *  The total number of bytes sent and recieved will be the maximum of
+     *  tx_length and rx_length. The bytes written will be padded with the
+     *  value 0xff.
+     *
+     *  @param tx_buffer Pointer to the byte-array of data to write to the device
+     *  @param tx_length Number of bytes to write, may be zero
+     *  @param rx_buffer Pointer to the byte-array of data to read from the device
+     *  @param rx_length Number of bytes to read, may be zero
+     *  @returns
+     *      The number of bytes written and read from the device. This is
+     *      maximum of tx_length and rx_length.
+     */
+    virtual int transfer(const char *tx_buffer, int tx_length, char *rx_buffer, int rx_length);
 
-    int _bits;
-    int _mode;
-    int _hz;
 };
 
 } // namespace mbed

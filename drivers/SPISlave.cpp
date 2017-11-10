@@ -19,39 +19,30 @@
 
 namespace mbed {
 
-SPISlave::SPISlave(PinName mosi, PinName miso, PinName sclk, PinName ssel) :
-    _spi(),
-    _bits(8),
-    _mode(0),
-    _hz(1000000)
- {
-    spi_init(&_spi, mosi, miso, sclk, ssel);
-    spi_format(&_spi, _bits, _mode, 1);
-    spi_frequency(&_spi, _hz);
-}
+    SPISlave::SPISlave(PinName mosi, PinName miso, PinName sclk, PinName ssel) : SPIBase(mosi, miso, sclk, ssel,
+                                                                                         Slave) {
 
-void SPISlave::format(int bits, int mode) {
-    _bits = bits;
-    _mode = mode;
-    spi_format(&_spi, _bits, _mode, 1);
-}
+    }
 
-void SPISlave::frequency(int hz) {
-    _hz = hz;
-    spi_frequency(&_spi, _hz);
-}
+    int SPISlave::receive(void) {
+        return (spi_readable(&_spi));
+    }
 
-int SPISlave::receive(void) {
-    return(spi_slave_receive(&_spi));
-}
+    int SPISlave::read(void) {
+        return _base_read();
+    }
 
-int SPISlave::read(void) {
-    return(spi_slave_read(&_spi));
-}
+    void SPISlave::write(int value) {
+        _base_write(value);
+    }
 
-void SPISlave::reply(int value) {
-    spi_slave_write(&_spi, value);
-}
+    int SPISlave::transfer(int value) {
+        return _base_transfer(value);
+    }
+
+    int SPISlave::transfer(const char *tx_buffer, int tx_length, char *rx_buffer, int rx_length) {
+        return _base_transfer(tx_buffer, tx_length, rx_buffer, rx_length);
+    }
 
 } // namespace mbed
 

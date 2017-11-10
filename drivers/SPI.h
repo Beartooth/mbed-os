@@ -20,8 +20,8 @@
 
 #if defined (DEVICE_SPI) || defined(DOXYGEN_ONLY)
 
+#include "drivers/SPIBase.h"
 #include "platform/PlatformMutex.h"
-#include "hal/spi_api.h"
 #include "platform/SingletonPtr.h"
 #include "platform/NonCopyable.h"
 
@@ -73,7 +73,7 @@ namespace mbed {
  * @endcode
  * @ingroup drivers
  */
-class SPI : private NonCopyable<SPI> {
+class SPI : public SPIBase {
 
 public:
 
@@ -88,27 +88,6 @@ public:
      */
     SPI(PinName mosi, PinName miso, PinName sclk, PinName ssel=NC);
 
-    /** Configure the data transmission format
-     *
-     *  @param bits Number of bits per SPI frame (4 - 16)
-     *  @param mode Clock polarity and phase mode (0 - 3)
-     *
-     * @code
-     * mode | POL PHA
-     * -----+--------
-     *   0  |  0   0
-     *   1  |  0   1
-     *   2  |  1   0
-     *   3  |  1   1
-     * @endcode
-     */
-    void format(int bits, int mode = 0);
-
-    /** Set the spi bus clock frequency
-     *
-     *  @param hz SCLK frequency in hz (default = 1MHz)
-     */
-    void frequency(int hz = 1000000);
 
     /** Write to the SPI Slave and return the response
      *
@@ -117,7 +96,7 @@ public:
      *  @returns
      *    Response from the SPI slave
      */
-    virtual int write(int value);
+    virtual int transfer(int value);
 
     /** Write to the SPI Slave and obtain the response
      *
@@ -133,7 +112,11 @@ public:
      *      The number of bytes written and read from the device. This is
      *      maximum of tx_length and rx_length.
      */
-    virtual int write(const char *tx_buffer, int tx_length, char *rx_buffer, int rx_length);
+    virtual int transfer(const char *tx_buffer, int tx_length, char *rx_buffer, int rx_length);
+
+    virtual int read();
+
+    virtual void write(int value);
 
     /** Acquire exclusive access to this SPI bus
      */
@@ -143,14 +126,6 @@ public:
      */
     virtual void unlock(void);
 
-    /** Set default write data
-      * SPI requires the master to send some data during a read operation.
-      * Different devices may require different default byte values.
-      * For example: A SD Card requires default bytes to be 0xFF.
-      *
-      * @param data    Default character to be transmitted while read operation
-      */
-    void set_default_write_value(char data);
 
 #if DEVICE_SPI_ASYNCH
 
@@ -267,8 +242,8 @@ public:
     virtual ~SPI() {
     }
 
-protected:
-    spi_t _spi;
+    protected:
+
 
 #if DEVICE_SPI_ASYNCH
     CThunk<SPI> _irq;
@@ -279,10 +254,6 @@ protected:
     void aquire(void);
     static SPI *_owner;
     static SingletonPtr<PlatformMutex> _mutex;
-    int _bits;
-    int _mode;
-    int _hz;
-    char _write_fill;
 
 private:
     /* Private acquire function without locking/unlocking

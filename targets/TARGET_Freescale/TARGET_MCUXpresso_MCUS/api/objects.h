@@ -73,6 +73,7 @@ struct i2c_s {
 struct spi_s {
     uint32_t instance;
     uint8_t bits;
+    uint8_t fill;
 #if DEVICE_SPI_ASYNCH
     status_t status;
     dspi_master_handle_t spi_master_handle;

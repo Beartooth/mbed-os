@@ -571,6 +571,11 @@ static inline void DSPI_ClearStatusFlags(SPI_Type *base, uint32_t statusFlags)
  * @{
  */
 
+
+static inline uint32_t DSPI_GetEnabledInterrupts(SPI_Type *base) {
+    return base->RSER;
+}
+
 /*!
  * @brief Enables the DSPI interrupts.
  *
