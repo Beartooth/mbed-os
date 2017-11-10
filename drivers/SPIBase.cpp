@@ -89,27 +89,21 @@ namespace mbed {
     }
 
     int SPIBase::_base_transfer(int value) {
-        int rx_value;
+        char in, out = (char) value;
         lock();
-        if(_ctrl == Master) {
-            rx_value = spi_master_transfer(&_spi, value);
-        }
-        else {
-            rx_value = spi_slave_transfer(&_spi, value);
-        }
+
+        spi_transfer(&_spi, &out, 1, &in, 1);
+
         unlock();
-        return rx_value;
+        return in;
     }
 
     int SPIBase::_base_transfer(const char *tx_buffer, int tx_length, char *rx_buffer, int rx_length) {
         int length = 0;
         lock();
-        if(_ctrl == Master) {
-            length = spi_master_block_transfer(&_spi, tx_buffer, tx_length, rx_buffer, rx_length);
-        }
-        else {
-            length = spi_slave_block_transfer(&_spi, tx_buffer, tx_length, rx_buffer, rx_length);
-        }
+
+        length = spi_transfer(&_spi, tx_buffer, tx_length, rx_buffer, rx_length);
+
         unlock();
         return length;
     }
@@ -124,15 +118,12 @@ namespace mbed {
 
     int SPIBase::_base_read() {
         lock();
-        uint32_t tx_fill_enabled = spi_irq_get(&_spi, TxFillIrq);
+        int tx_fill_enabled = spi_irq_get(&_spi, TxFillIrq);
         int res;
         spi_irq_set(&_spi, TxFillIrq, 0);
-        if(_ctrl == Master) {
-            res = spi_master_read(&_spi);
-        }
-        else {
-            res = spi_slave_read(&_spi);
-        }
+
+        res = spi_read(&_spi);
+
         spi_irq_set(&_spi, TxFillIrq, tx_fill_enabled);
         unlock();
         return res;
@@ -140,14 +131,11 @@ namespace mbed {
 
     void SPIBase::_base_write(int value) {
         lock();
-        uint32_t rx_drain_enabled = spi_irq_get(&_spi, RxDrainIrq);
+        int rx_drain_enabled = spi_irq_get(&_spi, RxDrainIrq);
         spi_irq_set(&_spi, RxDrainIrq, 0);
-        if(_ctrl == Master) {
-            spi_master_write(&_spi, value);
-        }
-        else {
-            spi_slave_write(&_spi, value);
-        }
+
+        spi_write(&_spi, value);
+
         spi_irq_set(&_spi, RxDrainIrq, rx_drain_enabled);
         unlock();
     }

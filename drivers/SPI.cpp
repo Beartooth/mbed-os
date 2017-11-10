@@ -63,7 +63,14 @@ namespace mbed {
     int SPI::transfer(int value) {
         lock();
         _acquire();
+        uint32_t tx_enabled = spi_irq_get(&_spi, TxFillIrq);
+        uint32_t rx_enabled = spi_irq_get(&_spi, RxDrainIrq);
+
+        spi_irq_set(&_spi, TxFillIrq, 0);
+        spi_irq_set(&_spi, RxDrainIrq, 0);
         int ret = _base_transfer(value);
+        spi_irq_set(&_spi, TxFillIrq, tx_enabled);
+        spi_irq_set(&_spi, RxDrainIrq, rx_enabled);
         unlock();
         return ret;
     }
@@ -71,17 +78,24 @@ namespace mbed {
     int SPI::transfer(const char *tx_buffer, int tx_length, char *rx_buffer, int rx_length) {
         lock();
         _acquire();
+        uint32_t tx_enabled = spi_irq_get(&_spi, TxFillIrq);
+        uint32_t rx_enabled = spi_irq_get(&_spi, RxDrainIrq);
+
+        spi_irq_set(&_spi, TxFillIrq, 0);
+        spi_irq_set(&_spi, RxDrainIrq, 0);
         int ret = _base_transfer(tx_buffer, tx_length, rx_buffer, rx_length);
+        spi_irq_set(&_spi, TxFillIrq, tx_enabled);
+        spi_irq_set(&_spi, RxDrainIrq, rx_enabled);
         unlock();
         return ret;
     }
 
     void SPI::lock() {
-        _mutex->lock();
+//        _mutex->lock();
     }
 
     void SPI::unlock() {
-        _mutex->unlock();
+//        _mutex->unlock();
     }
 
     int SPI::read() {
