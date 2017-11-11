@@ -118,25 +118,14 @@ namespace mbed {
 
     int SPIBase::_base_read() {
         lock();
-        int tx_fill_enabled = spi_irq_get(&_spi, TxFillIrq);
-        int res;
-        spi_irq_set(&_spi, TxFillIrq, 0);
-
-        res = spi_read(&_spi);
-
-        spi_irq_set(&_spi, TxFillIrq, tx_fill_enabled);
+        int res = spi_read(&_spi);
         unlock();
         return res;
     }
 
     void SPIBase::_base_write(int value) {
         lock();
-        int rx_drain_enabled = spi_irq_get(&_spi, RxDrainIrq);
-        spi_irq_set(&_spi, RxDrainIrq, 0);
-
         spi_write(&_spi, value);
-
-        spi_irq_set(&_spi, RxDrainIrq, rx_drain_enabled);
         unlock();
     }
 

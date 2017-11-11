@@ -44,6 +44,14 @@ namespace mbed {
         return _base_transfer(tx_buffer, tx_length, rx_buffer, rx_length);
     }
 
+    unsigned char SPISlave::fill() {
+        return _spi.fill;
+    }
+
+    void SPISlave::fill(unsigned char value) {
+        _spi.fill = value;
+    }
+
 } // namespace mbed
 
 #endif

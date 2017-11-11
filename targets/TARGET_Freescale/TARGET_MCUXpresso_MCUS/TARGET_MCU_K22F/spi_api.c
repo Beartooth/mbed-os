@@ -291,6 +291,8 @@ int spi_irq_get(spi_t *obj, SpiIrq irq) {
 }
 
 void spi_irq_handler(spi_t *obj, spi_isr handler, uint32_t id) {
+    DSPI_SetFifoEnable(spi_address[obj->instance], true, true);
+    int len = FSL_FEATURE_DSPI_FIFO_SIZEn(spi_address[obj->instance]);
     irq_handler = handler;
     spi_irq_ids[obj->instance] = id;
 }

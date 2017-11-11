@@ -114,6 +114,17 @@ public:
      */
     virtual int transfer(const char *tx_buffer, int tx_length, char *rx_buffer, int rx_length);
 
+    /** Get default write fill value
+     *
+     * @return default fill value
+     */
+    unsigned char fill();
+
+    /** Set default write value
+     *
+     * @param value     default value to fill during transfer
+     */
+    void fill(unsigned char value);
 };
 
 } // namespace mbed
