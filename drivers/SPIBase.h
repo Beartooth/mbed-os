@@ -76,7 +76,13 @@ namespace mbed {
          */
         int writeable();
 
-        /** Attach a function to call whenever a spi interrupt is generated
+        /** Check if spi is active
+         *
+         * @return true if active otherwise false
+         */
+        bool active();
+
+         /** Attach a function to call whenever a spi interrupt is generated
          *
          *  @param func A pointer to a void function, or 0 to set as none
          *  @param type Which spi interrupt to attach the member function to (SPIBase::TransferCompleteIrq for each transfer)
@@ -116,7 +122,7 @@ namespace mbed {
          *  @returns
          *    Response from the SPI slave
          */
-        virtual int _base_transfer(int value);
+        virtual int _base_transfer(int value, bool hold = false);
 
         /** Write to the SPI and obtain the response
          *
@@ -134,9 +140,13 @@ namespace mbed {
          */
         virtual int _base_transfer(const char *tx_buffer, int tx_length, char *rx_buffer, int rx_length);
 
-        virtual int _base_read();
+        virtual int _base_read(bool hold = false);
 
-        virtual void _base_write(int value);
+        virtual void _base_write(int value, bool hold = false);
+
+        uint8_t get_fill();
+
+        void set_fill(uint8_t value);
         spi_t _spi;
         Callback<void()> _irq[IrqCnt];
         Control _ctrl;

@@ -38,6 +38,11 @@ static spi_isr irq_handler;
 /* nvic irq names */
 static IRQn_Type spi_irqs[] = SPI_IRQS;
 
+static dspi_master_handle_t spi_master_handles[sizeof(spi_address)];
+static dspi_slave_handle_t spi_slave_handles[sizeof(spi_address)];
+static dspi_transfer_t spi_transfers[sizeof(spi_address)];
+static bool spi_transfer_complete[sizeof(spi_address)];
+
 /* unique id's for irq handlers */
 static uint32_t spi_irq_ids[FSL_FEATURE_SOC_DSPI_COUNT] = {0};
 
@@ -109,10 +114,25 @@ int spi_writable(spi_t *obj) {
     return (int) (DSPI_GetStatusFlags(spi_address[obj->instance]) & kDSPI_TxFifoFillRequestFlag);
 }
 
+int spi_active(spi_t *obj) {
+    return (int) DSPI_GetStatusFlags(spi_address[obj->instance]) & kDSPI_TxAndRxStatusFlag;
+}
+
 int spi_read(spi_t *obj) {
     int value = (int) DSPI_ReadData(spi_address[obj->instance]);
     DSPI_ClearStatusFlags(spi_address[obj->instance], kDSPI_RxFifoDrainRequestFlag);
     return value;
+}
+
+void spi_write_blocking(spi_t *obj, int value) {
+    if (DSPI_IsMaster(spi_address[obj->instance])) {
+        dspi_command_data_config_t command;
+        DSPI_GetDefaultDataCommandConfig(&command);
+        DSPI_MasterWriteDataBlocking(spi_address[obj->instance], &command, (uint16_t) value);
+    } else {
+        DSPI_SlaveWriteDataBlocking(spi_address[obj->instance], (uint32_t) value);
+    }
+    DSPI_ClearStatusFlags(spi_address[obj->instance], kDSPI_TxFifoFillRequestFlag);
 }
 
 void spi_write(spi_t *obj, int value) {
@@ -126,17 +146,22 @@ void spi_write(spi_t *obj, int value) {
     DSPI_ClearStatusFlags(spi_address[obj->instance], kDSPI_TxFifoFillRequestFlag);
 }
 
-//void spi_write(spi_t *obj, int value) {
-//    spi_write_fifo(obj, value);
-//}
-//
-//int spi_read(spi_t *obj) {
-//    if (spi_readable(obj)) {
-//        return spi_read_fifo(obj);
-//    } else {
-//        return spi_transfer(obj, obj->fill);
-//    }
-//}
+int spi_transfer(spi_t *obj, int value, bool hold) {
+    int resp = 0;
+    if(DSPI_IsMaster(spi_address[obj->instance])) {
+        dspi_command_data_config_t command;
+        DSPI_GetDefaultDataCommandConfig(&command);
+        command.isPcsContinuous = hold;
+        DSPI_MasterWriteDataBlocking(spi_address[obj->instance], &command, (uint16_t) value);
+    }
+    else {
+        DSPI_SlaveWriteData(spi_address[obj->instance], (uint16_t) value);
+    }
+    while(!(DSPI_GetStatusFlags(spi_address[obj->instance]) & kDSPI_RxFifoDrainRequestFlag));
+    resp = (int) DSPI_ReadData(spi_address[obj->instance]);
+    DSPI_ClearStatusFlags(spi_address[obj->instance], kDSPI_RxFifoDrainRequestFlag | kDSPI_TxFifoFillRequestFlag | kDSPI_EndOfQueueFlag);
+    return resp;
+}
 
 void spi_start_transfer(spi_t *obj) {
     if(spi_irq_ids[obj->instance] != 0) {
@@ -157,52 +182,51 @@ void spi_stop_transfer(spi_t *obj) {
     }
 }
 
-int spi_transfer(spi_t *obj, const char *tx_buffer, int tx_length, char *rx_buffer, int rx_length) {
-    dspi_command_data_config_t command;
-    uint32_t rx_data;
-    int total = (tx_length > rx_length) ? tx_length : rx_length;
-    DSPI_GetDefaultDataCommandConfig(&command);
-    command.isEndOfQueue = false;
-    command.isPcsContinuous = true;
-
-    if ((tx_buffer == NULL && tx_length > 0) || (rx_buffer == NULL && rx_length > 0)) {
-        return 0;
-    }
-
-    DSPI_StopTransfer(spi_address[obj->instance]);
-    DSPI_ClearStatusFlags(spi_address[obj->instance], kDSPI_EndOfQueueFlag);
-    DSPI_StartTransfer(spi_address[obj->instance]);
-
-
-    for (int i = 0; i < total; i++) {
-        char out = (i < tx_length) ? tx_buffer[i] : obj->fill;
-        if (i == total - 1) {
-            command.isEndOfQueue = true;
-            command.isPcsContinuous = false;
-        }
-
-        while (!spi_writable(obj));
-        if (DSPI_IsMaster(spi_address[obj->instance])) {
-            DSPI_MasterWriteData(spi_address[obj->instance], &command, (uint16_t) out);
-        } else {
-            DSPI_SlaveWriteData(spi_address[obj->instance], (uint32_t) out);
-        }
-
-        if (i < rx_length) {
-            while (!spi_readable(obj));
-            rx_buffer[i] = (char) spi_read(obj);
-        }
-    }
-
-    DSPI_ClearStatusFlags(spi_address[obj->instance], kDSPI_EndOfQueueFlag);
-
-    DSPI_StopTransfer(spi_address[obj->instance]);
-
-    return total;
-}
+//int spi_transfer(spi_t *obj, const char *tx_buffer, int tx_length, char *rx_buffer, int rx_length) {
+//    dspi_command_data_config_t command;
+//    uint32_t rx_data;
+//    int total = (tx_length > rx_length) ? tx_length : rx_length;
+//    DSPI_GetDefaultDataCommandConfig(&command);
+//    command.isEndOfQueue = false;
+//    command.isPcsContinuous = true;
+//
+//    if ((tx_buffer == NULL && tx_length > 0) || (rx_buffer == NULL && rx_length > 0)) {
+//        return 0;
+//    }
+//
+//    DSPI_StopTransfer(spi_address[obj->instance]);
+//    DSPI_ClearStatusFlags(spi_address[obj->instance], kDSPI_EndOfQueueFlag);
+//    DSPI_StartTransfer(spi_address[obj->instance]);
+//
+//
+//    for (int i = 0; i < total; i++) {
+//        char out = (i < tx_length) ? tx_buffer[i] : obj->fill;
+//        if (i == total - 1) {
+//            command.isEndOfQueue = true;
+//            command.isPcsContinuous = false;
+//        }
+//
+//        while (!spi_writable(obj));
+//        if (DSPI_IsMaster(spi_address[obj->instance])) {
+//            DSPI_MasterWriteData(spi_address[obj->instance], &command, (uint16_t) out);
+//        } else {
+//            DSPI_SlaveWriteData(spi_address[obj->instance], (uint32_t) out);
+//        }
+//
+//        if (i < rx_length) {
+//            while (!spi_readable(obj));
+//            rx_buffer[i] = (char) spi_read(obj);
+//        }
+//    }
+//
+//    DSPI_ClearStatusFlags(spi_address[obj->instance], kDSPI_EndOfQueueFlag);
+//
+//    DSPI_StopTransfer(spi_address[obj->instance]);
+//
+//    return total;
+//}
 
 void spi_irq(uint32_t tx_fill, uint32_t rx_drain, uint32_t index) {
-    SPI_Type *base = spi_address[index];
 
     if (spi_irq_ids[index] != 0) {
         if (tx_fill) {
@@ -296,5 +320,84 @@ void spi_irq_handler(spi_t *obj, spi_isr handler, uint32_t id) {
     irq_handler = handler;
     spi_irq_ids[obj->instance] = id;
 }
+
+void DSPI_SlaveTransferCallback(SPI_Type *base, dspi_slave_handle_t *handle, status_t status, void *userData) {
+    spi_t *obj = (spi_t*)userData;
+    if(status == kStatus_Success) {
+//        spi_irq(obj->instance);
+    }
+}
+
+void DSPI_MasterTransferCallback(SPI_Type *base, dspi_master_handle_t *handle, status_t status, void *userData) {
+    spi_t *obj = (spi_t*)userData;
+    if(status == kStatus_Success) {
+//        spi_irq(obj->instance);
+    }
+}
+
+//void spi_transfer_non_blocking(spi_t *obj, uint8_t *tx_data, uint8_t *rx_data, size_t size) {
+//    uint32_t idx = obj->instance;
+//    SPI_Type *spi = spi_address[idx];
+//    bool master = DSPI_IsMaster(spi);
+//
+//    spi_transfers[idx].txData = tx_data;
+//    spi_transfers[idx].rxData = rx_data;
+//    spi_transfers[idx].dataSize = size;
+//
+//    if(master) {
+//        DSPI_MasterTransferCreateHandle(spi, &spi_master_handles[idx], DSPI_MasterTransferCallback, obj);
+//
+//        spi_transfers[idx].configFlags = kDSPI_MasterCtar0 | kDSPI_Pcs0 | kDSPI_MasterPcsContinuous;
+//
+//        DSPI_MasterTransferNonBlocking(spi, &spi_master_handles[idx], &spi_transfers[idx]);
+//    } else {
+//        DSPI_SlaveTransferCreateHandle(spi, &spi_slave_handles[idx], DSPI_SlaveTransferCallback, obj);
+//
+//        spi_transfers[idx].configFlags = kDSPI_SlaveCtar0;
+//
+//        DSPI_SlaveTransferNonBlocking(spi, &spi_slave_handles[idx], &spi_transfers[idx]);
+//    }
+//}
+
+void spi_transfer_blocking(spi_t *obj, uint8_t *tx_data, uint8_t *rx_data, size_t size) {
+    uint32_t idx = obj->instance;
+    SPI_Type *spi = spi_address[idx];
+    bool master = DSPI_IsMaster(spi);
+
+    spi_transfers[idx].txData = tx_data;
+    spi_transfers[idx].rxData = rx_data;
+    spi_transfers[idx].dataSize = size;
+
+    if(master) {
+        DSPI_MasterTransferCreateHandle(spi, &spi_master_handles[idx], DSPI_MasterTransferCallback, obj);
+
+        spi_transfers[idx].configFlags = kDSPI_MasterCtar0 | kDSPI_Pcs0 | kDSPI_MasterPcsContinuous;
+
+        DSPI_MasterTransferBlocking(spi, &spi_transfers[idx]);
+
+    } else {
+        DSPI_SlaveTransferCreateHandle(spi, &spi_slave_handles[idx], DSPI_SlaveTransferCallback, obj);
+
+        spi_transfers[idx].configFlags = kDSPI_SlaveCtar0;
+
+        DSPI_SlaveTransferNonBlocking(spi, &spi_slave_handles[idx], &spi_transfers[idx]);
+
+        while(!spi_transfer_complete[idx]){}
+    }
+}
+
+void spi_transfer_abort(spi_t *obj) {
+    uint32_t idx = obj->instance;
+    SPI_Type *spi = spi_address[idx];
+    bool master = DSPI_IsMaster(spi);
+
+    if(master) {
+        DSPI_MasterTransferAbort(spi, &spi_master_handles[idx]);
+    }
+    else {
+        DSPI_SlaveTransferAbort(spi, &spi_slave_handles[idx]);
+    }
+}
+
 
 #endif

@@ -88,24 +88,29 @@ namespace mbed {
         }
     }
 
-    int SPIBase::_base_transfer(int value) {
-        char in, out = (char) value;
+    int SPIBase::_base_transfer(int value, bool hold) {
+        int inValue;
         lock();
-
-        spi_transfer(&_spi, &out, 1, &in, 1);
-
+        inValue = spi_transfer(&_spi, value, hold);
         unlock();
-        return in;
+        return inValue;
     }
 
     int SPIBase::_base_transfer(const char *tx_buffer, int tx_length, char *rx_buffer, int rx_length) {
-        int length = 0;
         lock();
+        int total = (tx_length > rx_length) ? tx_length : rx_length;
 
-        length = spi_transfer(&_spi, tx_buffer, tx_length, rx_buffer, rx_length);
+        for(int i = 0; i < total; i++) {
+            int out = (i < tx_length) ? tx_buffer[i] : get_fill();
+            bool hold = (i < total-1);
+            int in = spi_transfer(&_spi, out, hold);
+            if(in < rx_length) {
+                rx_buffer[i] = (char) in;
+            }
+        }
 
         unlock();
-        return length;
+        return total;
     }
 
     void SPIBase::lock() {
@@ -116,19 +121,31 @@ namespace mbed {
         // do nothing
     }
 
-    int SPIBase::_base_read() {
+    int SPIBase::_base_read(bool hold) {
         lock();
         int res = spi_read(&_spi);
+//        int res = spi_transfer(&_spi, get_fill(), hold);
         unlock();
         return res;
     }
 
-    void SPIBase::_base_write(int value) {
+    void SPIBase::_base_write(int value, bool hold) {
         lock();
-        spi_write(&_spi, value);
+        spi_transfer(&_spi, value, hold);
         unlock();
     }
 
+    uint8_t SPIBase::get_fill() {
+        return _spi.fill;
+    }
+
+    void SPIBase::set_fill(uint8_t value) {
+        _spi.fill = value;
+    }
+
+    bool SPIBase::active() {
+        return spi_active(&_spi) != 0;
+    }
 }
 
 #endif

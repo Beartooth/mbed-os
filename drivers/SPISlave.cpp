@@ -45,11 +45,11 @@ namespace mbed {
     }
 
     unsigned char SPISlave::fill() {
-        return _spi.fill;
+        return get_fill();
     }
 
     void SPISlave::fill(unsigned char value) {
-        _spi.fill = value;
+        set_fill(value);
     }
 
 } // namespace mbed

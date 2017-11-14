@@ -124,6 +124,12 @@ int spi_readable(spi_t *obj);
  */
 int spi_writable(spi_t *obj);
 
+/** Check if spi is active
+ *
+ * @return  non-zero if spi is running, otherwise zero
+ */
+int spi_active(spi_t *obj);
+
 /** Read data from fifo
  *
  * @param obj       The SPI peripheral
@@ -158,6 +164,15 @@ void spi_write(spi_t *obj, int value);
  */
 int spi_read(spi_t *obj);
 
+/** Transfer single frame over spi
+ *
+ * @param obj       The SPI peripheral
+ * @param value     The value to send
+ * @param hold      Set to true to keep control of bus, or false to release after transfer completed (Master only)
+ * @return          Value received
+ */
+int spi_transfer(spi_t *obj, int value, bool hold);
+
 
 /** Write a block of data out over spi
  *
@@ -165,7 +180,7 @@ int spi_read(spi_t *obj);
  *  tx_length and rx_length. The bytes written will be padded with the
  *  value 0xff.
  *
- * @param[in] obj        The SPI peripheral to use for sending
+ * @param[in] obj     The SPI peripheral to use for sending
  * @param[in] buffer  Pointer to the byte-array of data to write to the device
  * @param[in] length  Number of bytes to write
  * @returns
@@ -200,7 +215,7 @@ int spi_block_read(spi_t *obj, char *buffer, int length);
  *      The number of bytes written and read from the device. This is
  *      maximum of tx_length and rx_length.
  */
-int spi_transfer(spi_t *obj, const char *tx_buffer, int tx_length, char *rx_buffer, int rx_length);
+//int spi_transfer(spi_t *obj, const char *tx_buffer, int tx_length, char *rx_buffer, int rx_length);
 
 /** Checks if the specified SPI peripheral is in use
  *
@@ -241,6 +256,7 @@ int spi_irq_get(spi_t *obj, SpiIrq irq);
 void spi_irq_handler(spi_t *obj, spi_isr handler, uint32_t id);
 
 
+void spi_transfer_non_blocking();
 
 /**@}*/
 
