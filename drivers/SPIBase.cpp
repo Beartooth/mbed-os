@@ -59,7 +59,7 @@ namespace mbed {
         core_util_critical_section_enter();
         if(func) {
             // lock deep sleep only the first time
-            if(_irq[type]) {
+            if(!_irq[type]) {
                 sleep_manager_lock_deep_sleep();
             }
             _irq[type] = func;
@@ -131,7 +131,13 @@ namespace mbed {
 
     void SPIBase::_base_write(int value, bool hold) {
         lock();
-        spi_transfer(&_spi, value, hold);
+        if(!hold) {
+            spi_write_fifo(&_spi, value);
+        }
+        else {
+            spi_write(&_spi, value);
+        }
+
         unlock();
     }
 
@@ -145,6 +151,14 @@ namespace mbed {
 
     bool SPIBase::active() {
         return spi_active(&_spi) != 0;
+    }
+
+    uint32_t SPIBase::transfer_count() {
+        return spi_transfer_count(&_spi);
+    }
+
+    void SPIBase::flush() {
+        spi_flush(&_spi);
     }
 }
 

@@ -130,6 +130,15 @@ int spi_writable(spi_t *obj);
  */
 int spi_active(spi_t *obj);
 
+
+void spi_flush(spi_t *obj);
+/** Get number of bytes transfered
+ *
+ * @param obj
+ * @return
+ */
+int spi_transfer_count(spi_t *obj);
+
 /** Read data from fifo
  *
  * @param obj       The SPI peripheral

@@ -118,13 +118,21 @@ int spi_active(spi_t *obj) {
     return (int) DSPI_GetStatusFlags(spi_address[obj->instance]) & kDSPI_TxAndRxStatusFlag;
 }
 
+void spi_flush(spi_t *obj) {
+    DSPI_FlushFifo(spi_address[obj->instance], true, false);
+}
+
+int spi_transfer_count(spi_t *obj) {
+    return (uint16_t)(spi_address[obj->instance]->TCR >> 16);
+}
+
 int spi_read(spi_t *obj) {
     int value = (int) DSPI_ReadData(spi_address[obj->instance]);
     DSPI_ClearStatusFlags(spi_address[obj->instance], kDSPI_RxFifoDrainRequestFlag);
     return value;
 }
 
-void spi_write_blocking(spi_t *obj, int value) {
+void spi_write(spi_t *obj, int value) {
     if (DSPI_IsMaster(spi_address[obj->instance])) {
         dspi_command_data_config_t command;
         DSPI_GetDefaultDataCommandConfig(&command);
@@ -135,7 +143,7 @@ void spi_write_blocking(spi_t *obj, int value) {
     DSPI_ClearStatusFlags(spi_address[obj->instance], kDSPI_TxFifoFillRequestFlag);
 }
 
-void spi_write(spi_t *obj, int value) {
+void spi_write_fifo(spi_t *obj, int value) {
     if (DSPI_IsMaster(spi_address[obj->instance])) {
         dspi_command_data_config_t command;
         DSPI_GetDefaultDataCommandConfig(&command);
@@ -319,6 +327,7 @@ void spi_irq_handler(spi_t *obj, spi_isr handler, uint32_t id) {
     int len = FSL_FEATURE_DSPI_FIFO_SIZEn(spi_address[obj->instance]);
     irq_handler = handler;
     spi_irq_ids[obj->instance] = id;
+
 }
 
 void DSPI_SlaveTransferCallback(SPI_Type *base, dspi_slave_handle_t *handle, status_t status, void *userData) {

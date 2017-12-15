@@ -82,6 +82,11 @@ namespace mbed {
          */
         bool active();
 
+        void flush();
+
+
+        uint32_t transfer_count();
+
          /** Attach a function to call whenever a spi interrupt is generated
          *
          *  @param func A pointer to a void function, or 0 to set as none
