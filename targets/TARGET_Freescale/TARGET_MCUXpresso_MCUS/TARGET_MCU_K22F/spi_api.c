@@ -66,10 +66,12 @@ void spi_init(spi_t *obj, PinName mosi, PinName miso, PinName sclk, PinName ssel
     if (ssel != NC) {
         pinmap_pinout(ssel, PinMap_SPI_SSEL);
     }
-    obj->fill = SPI_FILL_CHAR;
+
+
 }
 
 void spi_free(spi_t *obj) {
+    DSPI_DisableInterrupts(spi_address[obj->instance], kDSPI_AllInterruptEnable);
     DSPI_Deinit(spi_address[obj->instance]);
 }
 
@@ -96,6 +98,10 @@ void spi_format(spi_t *obj, int bits, int mode, int slave) {
         master_config.ctarConfig.pcsToSckDelayInNanoSec = 0;
 
         DSPI_MasterInit(spi_address[obj->instance], &master_config, CLOCK_GetFreq(spi_clocks[obj->instance]));
+    }
+
+    if(DSPI_GetEnabledInterrupts(spi_address[obj->instance])) {
+        DSPI_DisableInterrupts(spi_address[obj->instance], kDSPI_AllInterruptEnable);
     }
 }
 
@@ -254,7 +260,10 @@ void spi0_irq() {
 
 void spi1_irq() {
     uint32_t status_flags = DSPI_GetStatusFlags(spi_address[1]);
-    spi_irq(status_flags & kDSPI_TxFifoFillRequestFlag, status_flags & kDSPI_RxFifoDrainRequestFlag, 1);
+    uint32_t interrupts = DSPI_GetEnabledInterrupts(spi_address[1]);
+    uint32_t tx_fill = (uint32_t) (interrupts & kDSPI_TxFifoFillRequestInterruptEnable && status_flags & kDSPI_TxFifoFillRequestFlag);
+    uint32_t rx_drain = (uint32_t)(interrupts & kDSPI_RxFifoDrainRequestInterruptEnable && status_flags & kDSPI_RxFifoDrainRequestFlag);
+    spi_irq(tx_fill, rx_drain, 1);
 }
 
 

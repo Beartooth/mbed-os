@@ -27,7 +27,7 @@ namespace mbed {
             RxIrq,
             TxIrq,
 //            TransferCompleteIrq,
-            IrqCnt
+                    IrqCnt
         };
 
         enum Control {
@@ -87,12 +87,12 @@ namespace mbed {
 
         uint32_t transfer_count();
 
-         /** Attach a function to call whenever a spi interrupt is generated
-         *
-         *  @param func A pointer to a void function, or 0 to set as none
-         *  @param type Which spi interrupt to attach the member function to (SPIBase::TransferCompleteIrq for each transfer)
-         */
-        void attach(Callback<void()> func, IrqType type=RxIrq);
+        /** Attach a function to call whenever a spi interrupt is generated
+        *
+        *  @param func A pointer to a void function, or 0 to set as none
+        *  @param type Which spi interrupt to attach the member function to (SPIBase::TransferCompleteIrq for each transfer)
+        */
+        void attach(Callback<void()> func, IrqType type = RxIrq);
 
         /** Set default write data
          * SPI requires the master to send some data during a read operation.
@@ -111,6 +111,7 @@ namespace mbed {
         /** Release exclusive access to this SPI bus
          */
         virtual void unlock(void);
+
     public:
 
 
@@ -118,7 +119,10 @@ namespace mbed {
 
     protected:
         SPIBase(PinName mosi, PinName miso, PinName sclk, PinName ssel, Control ctrl, int frequency = 1000000);
-        virtual ~SPIBase() {}
+
+        virtual ~SPIBase() {
+            spi_free(&_spi);
+        }
 
         /** Write to the SPI and return the response
          *
@@ -152,6 +156,7 @@ namespace mbed {
         uint8_t get_fill();
 
         void set_fill(uint8_t value);
+
         spi_t _spi;
         Callback<void()> _irq[IrqCnt];
         Control _ctrl;
