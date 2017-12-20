@@ -29,7 +29,7 @@
 #include "mbed_rtos1_types.h"
 #include "mbed_rtos_storage.h"
 #include "platform/NonCopyable.h"
-
+#include "mbed_assert.h"
 namespace rtos {
 /** \addtogroup rtos */
 /** @{*/
