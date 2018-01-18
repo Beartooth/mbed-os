@@ -169,6 +169,8 @@ const PinMap PinMap_PWM[] = {
     {PTC3 , PWM_02, 4},
     {PTC4 , PWM_03, 4},
     {PTC5 , PWM_02, 7},
+    {PTC8 , PWM_34, 3},
+    {PTC9 , PWM_35, 3},
 
     {PTD0 , PWM_30, 4},
     {PTD1 , PWM_31, 4},
