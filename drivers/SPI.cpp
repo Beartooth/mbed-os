@@ -14,7 +14,6 @@
  * limitations under the License.
  */
 #include "drivers/SPI.h"
-#include "platform/mbed_critical.h"
 
 #if DEVICE_SPI_ASYNCH
 #include "platform/mbed_sleep.h"
@@ -114,11 +113,11 @@ int SPI::write(const char *tx_buffer, int tx_length, char *rx_buffer, int rx_len
 }
 
 void SPI::lock() {
-    _mutex->lock();
+//    _mutex->lock();
 }
 
 void SPI::unlock() {
-    _mutex->unlock();
+//    _mutex->unlock();
 }
 
 void SPI::set_default_write_value(char data) {
