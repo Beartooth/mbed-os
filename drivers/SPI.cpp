@@ -14,7 +14,6 @@
  * limitations under the License.
  */
 #include "drivers/SPI.h"
-#include "platform/mbed_critical.h"
 
 #if DEVICE_SPI_ASYNCH
 #include "platform/mbed_sleep.h"
