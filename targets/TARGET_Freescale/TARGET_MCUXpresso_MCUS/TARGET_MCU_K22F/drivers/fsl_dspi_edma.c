@@ -838,10 +838,13 @@ status_t DSPI_SlaveTransferEDMA(SPI_Type *base, dspi_slave_edma_handle_t *handle
 
     edma_tcd_t *softwareTCD = (edma_tcd_t *)((uint32_t)(&handle->dspiSoftwareTCD[1]) & (~0x1FU));
 
-    uint32_t instance = DSPI_GetInstance(base);
-    uint8_t whichCtar = (transfer->configFlags & DSPI_SLAVE_CTAR_MASK) >> DSPI_SLAVE_CTAR_SHIFT;
-    handle->bitsPerFrame =
-        (((base->CTAR_SLAVE[whichCtar]) & SPI_CTAR_SLAVE_FMSZ_MASK) >> SPI_CTAR_SLAVE_FMSZ_SHIFT) + 1;
+    uint32_t instance       = DSPI_GetInstance(base);
+    uint8_t  whichCtar      = (uint8_t) ((transfer->configFlags & DSPI_SLAVE_CTAR_MASK) >> DSPI_SLAVE_CTAR_SHIFT);
+    uint32_t bits_per_frame =
+                     (((base->CTAR_SLAVE[whichCtar]) & SPI_CTAR_SLAVE_FMSZ_MASK) >> SPI_CTAR_SLAVE_FMSZ_SHIFT) + 1;
+    handle->bitsPerFrame = bits_per_frame;
+//    handle->bitsPerFrame =
+//        (((base->CTAR_SLAVE[whichCtar]) & SPI_CTAR_SLAVE_FMSZ_MASK) >> SPI_CTAR_SLAVE_FMSZ_SHIFT) + 1;
 
     /* If using a shared RX/TX DMA request, then this limits the amount of data we can transfer
     * due to the linked channel. The max bytes is 511 if 8-bit/frame or 1022 if 16-bit/frame
