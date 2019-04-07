@@ -18,13 +18,8 @@
 #ifndef MBED_DEVICE_H
 #define MBED_DEVICE_H
 
-
-
-
-
-
-
-
+// we don't use semihosting
+#undef DEVICE_SEMIHOST
 
 
 
