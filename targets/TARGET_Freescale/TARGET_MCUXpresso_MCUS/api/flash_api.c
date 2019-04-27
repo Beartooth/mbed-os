@@ -28,6 +28,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <stdio.h>
 #include "flash_api.h"
 #include "mbed_critical.h"
 
@@ -83,7 +84,6 @@ int32_t flash_program_page(flash_t *obj, uint32_t address, const uint8_t *data, 
     /* We need to prevent flash accesses during program operation */
     core_util_critical_section_enter();
     status = FLASH_Program(&obj->flash_config, address, (uint32_t *)data, size);
-
     if (status == kStatus_Success) {
         // Must use kFlashMargin_User, or kFlashMargin_Factory for verify program
         status = FLASH_VerifyProgram(&obj->flash_config, address, size,
